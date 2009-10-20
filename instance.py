@@ -1,10 +1,8 @@
 #!/usr/bin/python
-import os, sys
-import socket
-import fcntl
-import struct
+import os, sys, socket
 
 from commands import getoutput
+from euca2ools import Euca2ool
 
 EUCA_LIB_PATH = '/var/lib/eucalyptus/'
 
@@ -35,19 +33,13 @@ class Instance():
         return os.path.join(EUCA_LIB_PATH, 'instances', self._username, self._instance_id)
 
     def update(self):
+        self.update_local()
+        self.update_euca()
+
+    def update_local(self):
         # obtain the compute node host name
         self._attrs['host_name'] = socket.gethostname()
             
-        # obtain the compute node host ip
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._attrs['host_ip'] = socket.inet_ntoa(fcntl.ioctl(
-            s.fileno(),
-            0x8915,  # SIOCGIFADDR
-            struct.pack('256s', 'eth0')
-        )[20:24])
- 
-        # check local file system
-
         # TODO: support multiple mac addresses per instance.
         # the virsh call below will return one mac addresses
         # per adapater.
@@ -64,8 +56,45 @@ class Instance():
         # read tail of console.log
         self._attrs['console_log'] = getoutput('tail %s' % os.path.join(self.get_instance_path(), 'console.log'))
 
+    def update_euca(self):
+        try:
+            euca = Euca2ool()
+        except Exception, e:
+            print >> sys.stderr, e
+            return
+
+        conn = euca.make_connection()
+        reservations = conn.get_all_instances(self._instance_id)
+
+        reservation = None
+        instance = None
+
+        for r in reservations:
+            for i in r.instances:
+                if i.id == self._instance_id:
+                    reservation = r
+                    instance = i
+                    break
+
+        if instance:
+            self._attrs['image_id'] = instance.image_id
+            self._attrs['kernel'] = instance.kernel
+            self._attrs['ramdisk'] = instance.ramdisk
+            self._attrs['private_dns_name'] = instance.private_dns_name
+            self._attrs['state'] = instance.state
+            self._attrs['previous_state'] = instance.previous_state
+            self._attrs['shutdown_state'] = instance.shutdown_state
+
+            if instance.launch_time:
+                self._attrs['launch_time'] = instance.launch_time
+
+            if instance.instance_type:
+                self._attrs['instance_type'] = instance.instance_type
+ 
+
     def show_details(self):
         print >> sys.stderr, 'instance id: %s' % self._instance_id
+        print >> sys.stderr, 'username: %s' % self._username
 
         for key, value in self._attrs.iteritems():
             print >> sys.stderr, '\n%s:\n%s' % (key, value,)
