@@ -2,6 +2,7 @@
 import os, sys, socket
 
 from commands import getoutput
+from datetime import datetime
 from euca2ools import Euca2ool
 
 EUCA_LIB_PATH = '/var/lib/eucalyptus/'
@@ -15,6 +16,7 @@ class Instance():
     def __init__(self, username, instance_id, update=True):
         self._username = username
         self._instance_id = instance_id
+        self._last_updated = None
         self._attrs = dict()
 
         if update:
@@ -26,6 +28,9 @@ class Instance():
     def get_instance_id(self):
         return self.instance_id
 
+    def get_last_updated(self):
+        return self._last_updated
+
     def get_attrs(self):
         return self._attrs
 
@@ -35,6 +40,8 @@ class Instance():
     def update(self):
         self.update_local()
         self.update_euca()
+
+        self._last_updated = datetime.now()
 
     def update_local(self):
         # obtain the compute node host name
@@ -96,6 +103,7 @@ class Instance():
     def show_details(self):
         print >> sys.stderr, 'instance id: %s' % self._instance_id
         print >> sys.stderr, 'username: %s' % self._username
+        print >> sys.stderr, 'last_updated: %s' % self._last_updated
 
         for key, value in self._attrs.iteritems():
             print >> sys.stderr, '\n%s:\n%s' % (key, value,)
