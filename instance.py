@@ -6,6 +6,7 @@ from datetime import datetime
 from euca2ools import Euca2ool
 
 EUCA_LIB_PATH = '/var/lib/eucalyptus/'
+EUCA_LOG_PATH = '/var/log/eucalyptus/'
 
 class Instance():
     """
@@ -18,9 +19,29 @@ class Instance():
         self._instance_id = instance_id
         self._last_updated = None
         self._attrs = dict()
-
+        self._create_log_hardlink()
+        
         if update:
             self.update()
+            
+    def _create_log_hardlink(self):
+        """
+        Create a hardlink to the instance's console.log so that
+        when an instance is torn down, the log is never lost.
+        """
+        source = os.path.join(self.get_instance_path(), 'console.log')
+        target = os.path.join(EUCA_LOG_PATH, self._instance_id + '.log')
+        
+        # Ensure the instance path exists.
+        if not os.path.exists(self.get_instance_path()):
+            os.makedirs(self.get_instance_path())
+
+        # Ensure the console.log file exists.
+        if not os.path.exists(source):
+            open(source, 'a').close()
+            
+        # Create the hard link.
+        os.link(source, target)
 
     def get_username(self):
         return self._username
@@ -65,7 +86,7 @@ class Instance():
             pass
 
         # read tail of console.log
-        self._attrs['console_log'] = getoutput('tail %s' % os.path.join(self.get_instance_path(), 'console.log'))
+        #self._attrs['console_log'] = getoutput('tail %s' % os.path.join(self.get_instance_path(), 'console.log'))
 
     def update_euca(self):
         try:
