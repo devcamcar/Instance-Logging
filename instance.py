@@ -38,41 +38,42 @@ class Instance():
 
     def update_local(self):
         # obtain the compute node host name
-        self._attrs['host_name'] = socket.gethostname()
+        try:
+            self._attrs['host_name'] = socket.gethostname()
+        except:
+            self._attrs['host_name'] = 'unknown'
             
-        # TODO: support multiple mac addresses per instance.
-        # the virsh call below will return one mac addresses
-        # per adapater.
+        # fetch mac address(es) from virsh
+        try:
+            self._attrs['mac_address'] = getoutput('virsh dumpxml %s | grep "mac address" | cut -d\\\' -f2' % self._instance_id).splitlines()[1:]
+        except IndexError:
+            pass        
 
-        # fetch mac address from virsh
-        self._attrs['mac_address'] = getoutput('virsh dumpxml %s | grep "mac address" | cut -d\\\' -f2' % self._instance_id).splitlines()[1]
-        
         # check virsh for information about this instance
-        data = getoutput('virsh list | grep "%s"' % self._instance_id).splitlines()[1].split()
-        
-        self._attrs['libvirt_id'] = data[0]
-        self._attrs['libvirt_status'] = data[2]
+        try:
+            data = getoutput('virsh list | grep "%s"' % self._instance_id).splitlines()[1].split()
+            self._attrs['libvirt_id'] = data[0]
+            self._attrs['libvirt_status'] = data[2]
+        except IndexError:
+            pass
 
         # read tail of console.log
         self._attrs['console_log'] = getoutput('tail %s' % os.path.join(self.get_instance_path(), 'console.log'))
 
     def update_euca(self):
         try:
-            euca = Euca2ool()
+            euca = Euca2ool()        
+            conn = euca.make_connection()
+            reservations = conn.get_all_instances(self._instance_id)
         except Exception, e:
             print >> sys.stderr, e
             return
 
-        conn = euca.make_connection()
-        reservations = conn.get_all_instances(self._instance_id)
-
-        reservation = None
         instance = None
 
         for r in reservations:
             for i in r.instances:
                 if i.id == self._instance_id:
-                    reservation = r
                     instance = i
                     break
 
