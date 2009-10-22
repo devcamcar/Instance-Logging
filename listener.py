@@ -18,10 +18,10 @@ def main():
             path_parts = instance_path.split('/')
             username = path_parts[-2]
             instance_id = path_parts[-1]
-            
+
             if username == 'logs':
                 continue
-            
+        
             if not instance_id in instances:
                 print >> sys.stderr, 'found instance: %s' % instance_id
                 instances[instance_id] = Instance(username, instance_id, update=False)

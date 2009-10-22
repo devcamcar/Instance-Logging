@@ -35,7 +35,7 @@ class Instance():
         # If the hard link already exists, return.
         if os.path.exists(target):
             return
-        
+
         # Ensure the log path exists.
         if not os.path.exists(EUCA_LOG_PATH):
             os.makedirs(EUCA_LOG_PATH)
@@ -46,13 +46,13 @@ class Instance():
         
         # Create the hard link.
         os.link(source, target)
-    
+        
     def _log_change(self, key, value):
         """
         Used to log attribute changes to the syslog server.
         """
         self._log('%s changed to %s' % (key, value,))
-    
+        
     def _log(self, message, level=LEVEL.notice):
         """
         Logs a message to the syslog server defined by SYSLOG_SERVER.
@@ -81,11 +81,12 @@ class Instance():
                 changed = True
         else:
             changed = True
-        
+            
         if changed:
             self._attrs[key] = value
             self._log_change(key, value)
-    
+            print >> sys.stderr, '%s: %s changed to %s' % (self.id, key, str(value),)
+
     def get_attrs(self):
         """
         Returns a dictionary of all instance attributes.
@@ -114,21 +115,24 @@ class Instance():
         """
         # obtain the compute node host name
         try:
-            self._attrs['host_name'] = socket.gethostname()
+            self.set_attr('host_name', socket.gethostname())
         except:
-            self._attrs['host_name'] = 'unknown'
+            self.set_attr('host_name', 'unknown')
         
         # fetch mac address(es) from virsh
         try:
-            self._attrs['mac_address'] = getoutput('virsh dumpxml %s | grep "mac address" | cut -d\\\' -f2' % self.id).splitlines()[1:]
+            self.set_attr(
+                'mac_address',
+                getoutput('virsh dumpxml %s | grep "mac address" | cut -d\\\' -f2' % self.id).splitlines()[1:]
+            )
         except IndexError:
             pass
         
         # check virsh for information about this instance
         try:
             data = getoutput('virsh list | grep "%s"' % self.id).splitlines()[1].split()
-            self._attrs['libvirt_id'] = data[0]
-            self._attrs['libvirt_status'] = data[2]
+            self.set_attr('libvirt_id', data[0])
+            self.set_attr('libvirt_status', data[2])
         except IndexError:
             pass
         
@@ -156,19 +160,17 @@ class Instance():
                     break
         
         if instance:
-            self._attrs['image_id'] = instance.image_id
-            self._attrs['kernel'] = instance.kernel
-            self._attrs['ramdisk'] = instance.ramdisk
-            self._attrs['private_dns_name'] = instance.private_dns_name
-            self._attrs['state'] = instance.state
-            self._attrs['previous_state'] = instance.previous_state
-            self._attrs['shutdown_state'] = instance.shutdown_state
+            self.set_attr('image_id', instance.image_id)
+            self.set_attr('kernel', instance.kernel)
+            self.set_attr('ramdisk', instance.ramdisk)
+            self.set_attr('private_dns_name', instance.private_dns_name)
+            self.set_attr('state', instance.state)
             
             if instance.launch_time:
-                self._attrs['launch_time'] = instance.launch_time
+                self.set_attr('launch_time', instance.launch_time)
             
             if instance.instance_type:
-                self._attrs['instance_type'] = instance.instance_type
+                self.set_attr('instance_type', instance.instance_type)
     
     def mark_terminated(self):
         """
