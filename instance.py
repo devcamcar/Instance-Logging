@@ -5,6 +5,7 @@ from commands import getoutput
 from datetime import datetime
 from euca2ools import Euca2ool
 from settings import *
+from syslog_client import syslog, LEVEL
 
 class Instance():
     """
@@ -41,26 +42,73 @@ class Instance():
         
         # Create the hard link.
         os.link(source, target)
+        
+    def _log_change(self, key, value):
+        """
+        Used to log attribute changes to the syslog server.
+        """
+        self._log('%s changed to %s', % (key, value,))
+        
+    def _log(self, message, level=LEVEL.notice):
+        """
+        Logs a message to the syslog server defined by SYSLOG_SERVER.
+        """
+        syslog(message, level, host=SYSLOG_SERVER, port=SYSLOG_PORT)
     
-    def get_attr(self, name):
-        if name in self._attrs.keys()
-            return self._attrs[name]
+    def get_attr(self, key):
+        """
+        Returns the specified instance attribute.
+        """
+        if key in self._attrs.keys()
+            return self._attrs[key]
         else:
             return None
     
+    def set_attr(self, key, value):
+        """
+        Changes the specified instance attribute.
+        If the value is different or new, the change will 
+        be logged to the syslog server.
+        """
+        changed = False
+        
+        if key in self._attrs:
+            if self._attrs[key] != value:
+                changed = True
+        else:
+            changed = True
+            
+        self._attrs[key] = value
+        
+        if changed:
+            self._log_change(key, value)
+
     def get_attrs(self):
+        """
+        Returns a dictionary of all instance attributes.
+        """
         return self._attrs
-    
+        
     def get_instance_path(self):
+        """
+        Returns the location of the instance on the file system.
+        """
         return os.path.join(EUCA_LIB_PATH, 'instances', self.username, self.id)
     
     def update(self):
-        self.update_local()
-        self.update_euca()
-    
-        self.last_updated = datetime.now()
+        """
+        Causes the instance to update its current status.
+        """
+        
+        if not self.terminated:
+            self.update_local()
+            self.update_euca()
+            self.last_updated = datetime.now()
     
     def update_local(self):
+        """
+        Causes the instance to update attributes that come from the local compute node.
+        """
         # obtain the compute node host name
         try:
             self._attrs['host_name'] = socket.gethostname()
@@ -85,6 +133,9 @@ class Instance():
         #self._attrs['console_log'] = getoutput('tail %s' % os.path.join(self.get_instance_path(), 'console.log'))
     
     def update_euca(self):
+        """
+        Causes the instance to update attributes that come from eucalyptus.
+        """
         try:
             euca = Euca2ool()
             conn = euca.make_connection()
@@ -117,6 +168,9 @@ class Instance():
                 self._attrs['instance_type'] = instance.instance_type
     
     def mark_terminated(self):
+        """
+        Marks the instance as terminated. Further attemps to call update() will be ignored.
+        """
         self.terminated = True
     
     def show_details(self):
