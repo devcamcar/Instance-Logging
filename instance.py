@@ -32,9 +32,13 @@ class Instance():
         source = os.path.join(self.get_instance_path(), 'console.log')
         target = os.path.join(EUCA_LOG_PATH, self.id + '.log')
         
-        # Ensure the instance path exists.
-        if not os.path.exists(self.get_instance_path()):
-            os.makedirs(self.get_instance_path())
+        # If the hard link already exists, return.
+        if os.path.exists(target):
+            return
+        
+        # Ensure the log path exists.
+        if not os.path.exists(EUCA_LOG_PATH):
+            os.makedirs(EUCA_LOG_PATH)
         
         # Ensure the console.log file exists.
         if not os.path.exists(source):
@@ -42,13 +46,13 @@ class Instance():
         
         # Create the hard link.
         os.link(source, target)
-        
+    
     def _log_change(self, key, value):
         """
         Used to log attribute changes to the syslog server.
         """
-        self._log('%s changed to %s', % (key, value,))
-        
+        self._log('%s changed to %s' % (key, value,))
+    
     def _log(self, message, level=LEVEL.notice):
         """
         Logs a message to the syslog server defined by SYSLOG_SERVER.
@@ -59,7 +63,7 @@ class Instance():
         """
         Returns the specified instance attribute.
         """
-        if key in self._attrs.keys()
+        if key in self._attrs.keys():
             return self._attrs[key]
         else:
             return None
@@ -77,12 +81,11 @@ class Instance():
                 changed = True
         else:
             changed = True
-            
-        self._attrs[key] = value
         
         if changed:
+            self._attrs[key] = value
             self._log_change(key, value)
-
+    
     def get_attrs(self):
         """
         Returns a dictionary of all instance attributes.
