@@ -19,8 +19,9 @@ class Instance():
         self.last_updated = None
         self.terminated = False
         self._attrs = dict()
-        self._create_log_hardlink()
-        
+        self._log('Discovered instance')
+        self._create_log_hardlink()        
+
         if update:
             self.update()
     
@@ -57,7 +58,7 @@ class Instance():
         """
         Logs a message to the syslog server defined by SYSLOG_SERVER.
         """
-        syslog(message, level, host=SYSLOG_SERVER, port=SYSLOG_PORT)
+        syslog('%s: %s' % (self.id, message,), level, host=SYSLOG_SERVER, port=SYSLOG_PORT)
     
     def get_attr(self, key):
         """
@@ -121,10 +122,10 @@ class Instance():
         
         # fetch mac address(es) from virsh
         try:
-            self.set_attr(
-                'mac_address',
-                getoutput('virsh dumpxml %s | grep "mac address" | cut -d\\\' -f2' % self.id).splitlines()[1:]
-            )
+            output = getoutput('virsh dumpxml %s | grep "mac address" | cut -d\\\' -f2' % self.id)
+
+            if not 'error' in output:
+                self.set_attr('mac_address', output.splitlines()[1:])
         except IndexError:
             pass
         
@@ -171,12 +172,16 @@ class Instance():
             
             if instance.instance_type:
                 self.set_attr('instance_type', instance.instance_type)
+        else:
+            self.set_attr('state', 'unknown')
+
     
     def mark_terminated(self):
         """
         Marks the instance as terminated. Further attemps to call update() will be ignored.
         """
         self.terminated = True
+        self._log('Instance terminated')
     
     def show_details(self):
         print >> sys.stderr, 'instance id: %s' % self.id
